@@ -43,7 +43,7 @@ class App extends Component {
     } else {
       window.alert("EthSwap contract not deployed to detected network.");
     }
-
+    //this.mapEvents();
     this.setState({ loading: false });
   }
 
@@ -80,14 +80,63 @@ class App extends Component {
     this.setState({ ethBalance });
   }
 
-  buyTokens = (etherAmount) => {
+  async mapEvents() {
+    console.log("this.state.token.events=>", this.state.token.events);
+    this.state.token.once("Transfer", {}, function(error, event) {
+      console.log(event);
+    });
+
+    // this.state.token.events
+    //   .Transfer(
+    //     {
+    //       filter: {
+    //         myIndexedParam: [20, 23],
+    //         myOtherIndexedParam: "0x123456789...",
+    //       }, // Using an array means OR: e.g. 20 or 23
+    //       fromBlock: 0,
+    //     },
+    //     function(error, event) {
+    //       console.log(event);
+    //     }
+    //   )
+    //   .on("connected", function(subscriptionId) {
+    //     console.log(subscriptionId);
+    //   })
+    //   .on("data", function(event) {
+    //     console.log(event); // same results as the optional callback above
+    //   })
+    //   .on("changed", function(event) {
+    //     // remove event from local database
+    //   })
+    //   .on("error", function(error, receipt) {
+    //     // If the transaction was rejected by the network with a receipt, the second parameter will be the receipt.
+    //   });
+  }
+
+  buyTokens = async (etherAmount) => {
+    const web3 = window.web3;
     this.setState({ loading: true });
     this.state.ethSwap.methods
       .buyTokens()
       .send({ value: etherAmount, from: this.state.account })
       .on("transactionHash", async (hash) => {
-        await this.updateBalance();
-        this.setState({ loading: false });
+        this.setState({
+          loading: false,
+        });
+      })
+      .on("confirmation", async (confNumber, receipt, latestBlockHash) => {
+        //console.log("After confirmation=>", confNumber);
+        let tokenBalance = await this.state.token.methods
+          .balanceOf(this.state.account)
+          .call();
+        const ethBalance = await web3.eth.getBalance(this.state.account);
+        this.setState({ ethBalance });
+
+        //console.log("tokenBalance.toString()=>", tokenBalance.toString());
+        this.setState({
+          tokenBalance: tokenBalance.toString(),
+          ethBalance,
+        });
       });
   };
 
@@ -122,6 +171,7 @@ class App extends Component {
   };
 
   delayedSellTokens = (tokenAmount) => {
+    const web3 = window.web3;
     window.setTimeout(() => {
       console.log("delayedSellTokens");
       this.state.ethSwap.methods
@@ -129,6 +179,19 @@ class App extends Component {
         .send({ from: this.state.account })
         .on("transactionHash", (hash) => {
           this.setState({ loading: false });
+        })
+        .on("confirmation", async (confNumber, receipt, latestBlockHash) => {
+          let tokenBalance = await this.state.token.methods
+            .balanceOf(this.state.account)
+            .call();
+          const ethBalance = await web3.eth.getBalance(this.state.account);
+          this.setState({ ethBalance });
+
+          //console.log("tokenBalance.toString()=>", tokenBalance.toString());
+          this.setState({
+            tokenBalance: tokenBalance.toString(),
+            ethBalance,
+          });
         });
     }, 1000);
   };
